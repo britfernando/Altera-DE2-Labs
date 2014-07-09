@@ -1,0 +1,188 @@
+Part 3:
+
+module part2(SW,KEY,LEDG,LEDR);
+	input [1:0]SW;
+	input [0:0]KEY;
+	output [8:0]LEDR;
+	output [0:0]LEDG;
+        
+	parameter[8:0] A = 9'b000000001, 
+	parameter[8:0] B = 9'b000000010,
+	parameter[8:0] C = 9'b000000100,
+	parameter[8:0] D = 9'b000001000,
+	parameter[8:0] E = 9'b000010000,
+	parameter[8:0] F = 9'b000100000,
+	parameter[8:0] G = 9'b001000000,
+	parameter[8:0] H = 9'b010000000,
+	parameter[8:0] I = 9'b100000000;
+	reg [8:0] current_state, next_state;
+	 
+	                    
+	always @(posedge KEY[0])
+	    if (~SW[0]) 
+		     current_state <= A;
+		 else
+		      current_state <= next_state;
+				
+	always @(current_state,SW[1])
+	    case(current_state)
+		    	A: if(SW[1])
+			        next_state = F;
+				 else
+				     next_state = B;
+			B: if(SW[1])
+			        next_state = F;
+				 else
+				     next_state = C;
+			C: if(SW[1])
+			        next_state = F;
+				 else
+				     next_state = D;
+			D: if(SW[1])
+			        next_state = F;
+				 else
+				     next_state = E;
+			E: if(SW[1])
+			        next_state = F;
+				 else
+				     next_state = E;
+			F: if(SW[1])
+			        next_state = G;
+				 else
+				     next_state = B;
+			G: if(SW[1])
+			        next_state = H;
+				 else
+				     next_state = B;
+			H: if(SW[1])
+			        next_state = I;
+				 else
+				     next_state = B;
+			I: if(SW[1])
+			        next_state = I;
+				 else
+				     next_state = B;
+         endcase
+
+assign LEDG[0] = (current_state == (E|I));
+
+endmodule;
+
+Part 4:
+
+module ps2lab1(
+	input  CLOCK_50,
+	input  [3:0] KEY;
+  	input  [17:0] SW;
+  	output  [6:0] LCD;
+	output  [8:0] LEDG; 
+	output  [17:0] LEDR;
+	
+	input	PS2_DAT,
+	input	PS2_CLK,
+
+	inout  [35:0]  GPIO_0, GPIO_1
+	
+	assign  GPIO_0    =  36'hzzzzzzzzz;
+	assign  GPIO_1    =  36'hzzzzzzzzz;
+
+	wire RST;
+	assign RST = KEY[0];
+
+
+
+	assign LEDR[17:0] = SW[17:0];
+
+
+	assign LEDG = 0;
+
+	wire reset = 1'b0;
+	wire [7:0] scan_code;
+
+	reg [7:0] history[1:4];
+	wire read, scan_ready;
+
+	oneshot pulser(
+	.pulse_out(read),
+	.trigger_in(scan_ready),
+	.clk(CLOCK_50)
+	);
+
+	keyboard kbd(
+	.keyboard_clk(PS2_CLK),
+	.keyboard_data(PS2_DAT),
+	.clock50(CLOCK_50),
+	.reset(reset),
+	.read(read),
+	.scan_ready(scan_ready),
+	.scan_code(scan_code)
+	);
+
+	lcd dsp0(history[1][3:0],HEX0);
+
+	always @(posedge scan_ready)
+	begin
+		history[4] <= history[3];
+		history[3] <= history[2];
+		history[2] <= history[1];
+		history[1] <= scan_code;
+	end
+	
+
+endmodule;
+
+
+module LCDmodule(clk, RxD, LCD_RS, LCD_RW, LCD_E, LCD_DataBus);
+	input clk, RxD;
+	output LCD_RS, LCD_RW, LCD_E;
+	output [7:0] LCD_DataBus;
+
+	wire RxD_data_ready;
+	wire [7:0] RxD_data;
+	async_receiver deserialer(.clk(clk), .RxD(RxD), .RxD_data_ready(RxD_data_ready), .RxD_data(RxD_data));
+
+	assign LCD_RS = RxD_data[7];
+	assign LCD_DataBus = {1'b0, RxD_data[6:0]};   // sends only 7 bits to the module, padded with a '0' in front to make 8 bits
+
+	assign LCD_RW = 0;
+	reg [2:0] count;
+	always @(posedge clk) if(RxD_data_ready | (count!=0)) count <= count + 1;
+
+	reg LCD_E;
+	always @(posedge clk) LCD_E <= (count!=0); 
+endmodule
+
+\\based on code from http://www.fpga4fun.com/TextLCDmodule.html
+
+
+Part 5:
+
+module audio3(CLOCK_50, CLOCK_27, KEY, SW);
+	input CLOCK_50;
+	input CLOCK_27;
+
+	input  [3:0] KEY;
+	input  [17:0] SW,
+	
+
+
+	output  [8:0] LEDG;
+	output  [17:0] LEDR;
+
+	output TD_RESET;
+
+	inout  I2C_SDAT, // I2C Data
+	output I2C_SCLK, // I2C Clock
+	  // Audio CODEC
+	output/*inout*/ AUD_ADCLRCK, // Audio CODEC ADC LR Clock
+	input     AUD_ADCDAT,  // Audio CODEC ADC Data
+	output /*inout*/  AUD_DACLRCK, // Audio CODEC DAC LR Clock
+	output AUD_DACDAT,  // Audio CODEC DAC Data
+	inout     AUD_BCLK,    // Audio CODEC Bit-Stream Clock
+	output AUD_XCK,     // Audio CODEC Chip Clock
+	
+	inout  [35:0]  GPIO_0, GPIO_1
+
+endmodule;
+
+// based on http://www.johnloomis.org/digitallab/audio/audio3/audio3.qdoc.html#audio3.v
